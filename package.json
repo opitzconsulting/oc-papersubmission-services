@@ -1,10 +1,12 @@
 {
-    "name": "express-HelloWorld",
-    "description": "Hello World ExpressJS WebService",
-    "version": "0.0.1",
-    "private": true,
-    "dependencies": {
-        "express": "latest",
-        "aws-serverless-express": "latest"
-    }
+  "name": "oc-papersubmission-services",
+  "description": "Service implementation for OC Papersubmission Tool",
+  "version": "0.0.1",
+  "private": true,
+  "dev-dependencies": {
+    "aws-sdk": "latest"
+  },
+  "dependencies": {
+    "mailparser": "^2.2.0"
+  }
 }
