@@ -7,7 +7,8 @@ info:
   license:
     name: Apache 2.0
     url: http://www.apache.org/licenses/
-host: polls.apiblueprint.org
+host:
+    private-f2b62-ocpapersubmissionapi.apiary-mock.com
 basePath: /
 schemes:
 - https
@@ -27,33 +28,42 @@ paths:
         httpMethod: "POST"
         type: "aws_proxy"
         responses: {}
-      summary: List All Questions
+      summary: Upload Slides
+      description: >
+        Handles the Form Data to upload a slide. Creates a S3 bucket and returns a signed
+        URL for S3 to upload the binary file.
       # For CORS
+      consumes:
+        - "application/json"
+      produces:
+        - "application/json"
       parameters:
         - name: "Access-Control-Allow-Origin"
           in: "header"
           required: false
           type: "string"
+          default: "*"
+        - name: "form-data"
+          in: "body"
+          required: true
+          schema:
+            type: "object"
+            items: 
+              $ref: '#/definitions/SlidesUpload'
+            example:
+                { 
+                  "emailKey": "JAX Das Api ist der King",
+                  "description": "Die Folien für den Vortrag",
+                }
       responses:
         200:
-          description: Successful Response
+          description: >
+            The signed URL that can be used to upload the binary file.
           schema:
             type: string
-            items:
-              $ref: '#/definitions/Question'
           examples:
-            application/json:
-              - question: Favourite programming language?
-                published_at: '2015-08-05T08:40:51.620Z'
-                choices:
-                  - choice: Swift
-                    votes: 2048
-                  - choice: Python
-                    votes: 1024
-                  - choice: Objective-C
-                    votes: 512
-                  - choice: Ruby
-                    votes: 256
+            application/json: |
+              { "uploadUrl": "http://someurl"}
     options:
       consumes:
       - "application/json"
@@ -77,7 +87,7 @@ paths:
             statusCode: "200"
             responseParameters:
               method.response.header.Access-Control-Allow-Credentials: "'false'"
-              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,POST'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,POST'"
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
         passthroughBehavior: "when_no_match"
@@ -85,47 +95,14 @@ paths:
           application/json: "{statusCode:200}"
         type: "mock"
 definitions:
-  Question:
-    title: Question
-    type: object
-    properties:
-      question:
-        type: string
-      published_at:
-        type: string
-      choices:
-        type: array
-        items:
-          $ref: '#/definitions/Choice'
-    required:
-      - question
-      - published_at
-      - choices
-  Choice:
-    title: Choice
-    type: object
-    properties:
-      votes:
-        type: integer
-        format: int32
-      choice:
-        type: string
-    required:
-      - votes
-      - choice
-  QuestionRequest:
-    title: Question Request
-    type: object
-    properties:
-      question:
-        type: string
-      choices:
-        type: array
-        items:
+  SlidesUpload:
+     properties:
+        emailKey:
           type: string
-    required:
-      - question
-      - choices
+          description: The subject Key which can be used to request the slides per e-mail.
+        description:
+          type: string
+          description: A short description for the slides.
 # Don´t use examples in definitions ==> results in deployment error.
 #    example:
 #      question: 'Favourite programming language?'
