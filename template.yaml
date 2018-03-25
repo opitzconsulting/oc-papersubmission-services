@@ -1,0 +1,206 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  Name:
+    Type: String
+    Description: an Name to create distinct ressources for every member
+    MinLength: 1
+    MaxLength: 21
+    AllowedPattern: ^[a-zA-Z0-9]*$
+
+  SwaggerS3File:
+    Type: String
+    Description: The uploaded swagger.yaml
+
+#  SESRegion:
+#    Type: String
+#    Default: eu-west-1
+#    AllowedValues:
+#      - eu-west-1
+#      - us-east-1
+#      - us-west-2
+#    Description: Region in which SES service will be used
+
+Resources:
+  ApiGatewayApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Cors: "'*'"
+      # This handles the swagger file like an inline swagger definition.
+      # Used for parameter substitution for AWS::Region and Lambda ARN in Swagger file.
+      # The swagger file must be located in S3 that is automaticaly handles by the deploy script.
+      DefinitionBody:
+        'Fn::Transform':
+          Name: 'AWS::Include'
+          Parameters:
+            Location: !Ref 'SwaggerS3File'
+
+  SlidesBucket:
+    Type: AWS::S3::Bucket
+    Description: >
+      The bucket where the slides will be saved.
+    Properties:
+      BucketName: !Join ['-', [!Ref 'Name', !Ref 'AWS::AccountId', 'slides', 'oc-papersubmission']]
+
+  SlidesRequestsBucket:
+    Type: AWS::S3::Bucket
+    Description: >
+      The bucket where the raw e-mail requests will be saved for further processing.
+    Properties:
+
+      BucketName: !Join ['-', [!Ref 'Name', !Ref 'AWS::AccountId', 'getslides', 'oc-papersubmission']]
+
+  SlideUploadLambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: >
+        This function handles the form submit for uploading a slide. The function return a signed URL for uploading the
+        binary data
+      FunctionName: !Join ['-', [!Ref 'Name', 'SlideUpload', 'OC-Papersubmission']]
+      Handler: slide-upload/index.handler
+      Runtime: nodejs6.10
+      Role: !GetAtt SlideRequestLambdaRole.Arn
+      Environment:
+        Variables:
+          S3_BUCKET: !Ref 'SlidesBucket'
+      Events:
+        ProxyApiRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGatewayApi
+            Path: /slides
+            Method: POST
+
+  SlideRequestLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join ['-', [!Ref 'Name', 'SlideUploadFunction', 'Role']]
+      AssumeRolePolicyDocument:
+        Statement: [{Action: 'sts:AssumeRole', Effect: Allow, Principal: {Service: [lambda.amazonaws.com]}}]
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        # TODO: Change this to a more restrictive policy
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+      Path: /
+
+Outputs:
+  ApiUrl:
+    Description: URL of your API endpoint
+    Value: !Join
+      - ''
+      - - https://
+        - !Ref ApiGatewayApi
+        - '.execute-api.'
+        - !Ref 'AWS::Region'
+        - '.amazonaws.com/Prod'
+
+
+#  SlideRequest:
+#    Type: AWS::Serverless::Function
+#    Properties:
+#      Handler: slide-requests/index.handler
+#      Runtime: nodejs6.10
+#      Role: !GetAtt SlideRequestLambdaRole.Arn
+#      Environment:
+#        Variables:
+#          SES_REGION: !Ref SESRegion
+#      Events:
+#        SlideRequestReceived:
+#          Type: S3
+#          Properties:
+#            Bucket: !Ref 'SlidesRequestsBucket'
+#            Events: s3:ObjectCreated:*
+#
+#  SlideUpload:
+#    Type: AWS::Serverless::Function
+#    Properties:
+#      Handler: slide-upload/index.handler
+#      Runtime: nodejs6.10
+#      Role: !GetAtt SlideRequestLambdaRole.Arn
+#      Events:
+#        SlideUpload:
+#            Type: Api
+#            Properties:
+#              Path: /slide
+#              Method: post
+#
+#  SlideUploadLambdaFunction:
+#    Type: AWS::Serverless::Function
+#
+#  SlideRequestLambdaRole:
+#    Type: AWS::IAM::Role
+#    Properties:
+#      RoleName: !Join ['-', [!Ref 'AWS::StackName', 'Lambda']]
+#      AssumeRolePolicyDocument:
+#        Statement: [{Action: 'sts:AssumeRole', Effect: Allow, Principal: {Service: [lambda.amazonaws.com]}}]
+#      ManagedPolicyArns:
+#        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+#        - 'arn:aws:iam::aws:policy/service-role/AWSConfigRulesExecutionRole'
+#      Path: /
+#      Policies:
+#        -
+#          PolicyName: LambdaWorkerPolicy
+#          PolicyDocument:
+#            Version: 2012-10-17
+#            Statement:
+#              -
+#                Action: ['logs:CreateLogGroup', 'logs:CreateLogStream', 'logs:PutLogEvents']
+#                Effect: Allow
+#                Resource: '*'
+#        -
+#          PolicyName: BucketPolicy
+#          PolicyDocument:
+#            Version: 2012-10-17
+#            Statement:
+#              -
+#                Action: ['s3:GetObject']
+#                Effect: Allow
+#                Resource: !Join ['', ['arn:aws:s3:::', !Join ['.', [!Ref 'Name', !Ref 'AWS::AccountId', 'getslides', 'oc-papersubmission']], '/*']]
+#              -
+#                Action: ['s3:GetObject']
+#                Effect: Allow
+#                Resource: !Join ['', ['arn:aws:s3:::', !Ref 'SlidesBucket', '/*']]
+#        -
+#          PolicyName: SESPolicy
+#          PolicyDocument:
+#            Version: 2012-10-17
+#            Statement:
+#              -
+#                Action: ['ses:SendEmail']
+#                Effect: Allow
+#                Resource: !Join [':', ['arn:aws:ses', !Ref 'SESRegion', !Ref 'AWS::AccountId' , 'identity/*']]
+#
+#
+#  SlidesBucket:
+#    Type: "AWS::S3::Bucket"
+#    Properties:
+#      BucketName: !Join ['.', [!Ref 'Name', !Ref 'AWS::AccountId', 'slides', 'oc-papersubmission']]
+#
+#  SlidesRequestsBucket:
+#    Type: "AWS::S3::Bucket"
+#    Properties:
+#      BucketName: !Join ['.', [!Ref 'Name', !Ref 'AWS::AccountId', 'getslides', 'oc-papersubmission']]
+## https://github.com/awslabs/serverless-application-model/issues/275
+##      BucketEncryption:
+##        ServerSideEncryptionConfiguration:
+##          ServerSideEncryptionByDefault:
+##            SSEAlgorithm: AES256
+#  SlidesRequestsBucketPolicy:
+#    Type: "AWS::S3::BucketPolicy"
+#    Properties:
+#      Bucket: !Join ['.', [!Ref 'Name', !Ref 'AWS::AccountId', 'getslides', 'oc-papersubmission']]
+#      PolicyDocument:
+#        Statement:
+#          -
+#            Action:
+#              - "s3:PutObject"
+#            Effect: "Allow"
+#            Resource: !Join ['', ['arn:aws:s3:::', !Ref 'SlidesRequestsBucket', '/*']]
+#            Principal:
+#              "Service": "ses.amazonaws.com"
+#            Condition:
+#              StringEquals:
+#                aws:Referer:
+#                  - Ref: 'AWS::AccountId'
