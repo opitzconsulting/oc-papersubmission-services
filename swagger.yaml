@@ -1,0 +1,132 @@
+swagger: '2.0'
+info:
+  version: '1.0'
+  title: "OC Papersubmission API"
+  description: >
+    The API for using the OC Papersubmission system.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/
+host: polls.apiblueprint.org
+basePath: /
+schemes:
+- https
+consumes:
+- application/json
+produces:
+- application/json
+paths:
+  /slides:
+    post:
+      x-amazon-apigateway-integration:
+        uri:
+          Fn::Sub: "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SlideUploadLambdaFunction.Arn}/invocations"
+        passthroughBehavior: "when_no_match"
+        # !!! Must be POST this is only for the Lambda Integration and it is important to use POST because the API -
+        # Gateway must communicate with post requests with the Lambda Backend.
+        httpMethod: "POST"
+        type: "aws_proxy"
+        responses: {}
+      summary: List All Questions
+      # For CORS
+      parameters:
+        - name: "Access-Control-Allow-Origin"
+          in: "header"
+          required: false
+          type: "string"
+      responses:
+        200:
+          description: Successful Response
+          schema:
+            type: string
+            items:
+              $ref: '#/definitions/Question'
+          examples:
+            application/json:
+              - question: Favourite programming language?
+                published_at: '2015-08-05T08:40:51.620Z'
+                choices:
+                  - choice: Swift
+                    votes: 2048
+                  - choice: Python
+                    votes: 1024
+                  - choice: Objective-C
+                    votes: 512
+                  - choice: Ruby
+                    votes: 256
+    options:
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "200 response"
+          headers:
+            Access-Control-Allow-Origin:
+              type: "string"
+            Access-Control-Allow-Methods:
+              type: "string"
+            Access-Control-Allow-Credentials:
+              type: "string"
+            Access-Control-Allow-Headers:
+              type: "string"
+      x-amazon-apigateway-integration:
+        responses:
+          default:
+            statusCode: "200"
+            responseParameters:
+              method.response.header.Access-Control-Allow-Credentials: "'false'"
+              method.response.header.Access-Control-Allow-Methods: "'OPTIONS,GET,POST'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        passthroughBehavior: "when_no_match"
+        requestTemplates:
+          application/json: "{statusCode:200}"
+        type: "mock"
+definitions:
+  Question:
+    title: Question
+    type: object
+    properties:
+      question:
+        type: string
+      published_at:
+        type: string
+      choices:
+        type: array
+        items:
+          $ref: '#/definitions/Choice'
+    required:
+      - question
+      - published_at
+      - choices
+  Choice:
+    title: Choice
+    type: object
+    properties:
+      votes:
+        type: integer
+        format: int32
+      choice:
+        type: string
+    required:
+      - votes
+      - choice
+  QuestionRequest:
+    title: Question Request
+    type: object
+    properties:
+      question:
+        type: string
+      choices:
+        type: array
+        items:
+          type: string
+    required:
+      - question
+      - choices
+# Don´t use examples in definitions ==> results in deployment error.
+#    example:
+#      question: 'Favourite programming language?'
+#      choices: ['Swift', 'Python', 'Objective-C', 'Ruby']
