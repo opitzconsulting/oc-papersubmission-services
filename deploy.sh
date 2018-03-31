@@ -33,6 +33,21 @@ BUCKET="s3://$DEPLOYMENT_BUCKET/$FILENAME"
 aws s3 cp swagger.yaml ${BUCKET} --sse
 
 aws cloudformation package --template-file template.yaml --s3-bucket ${DEPLOYMENT_BUCKET} --output-template-file ${TEMPLATE_FILE}
-#aws cloudformation deploy --template-file ${TEMPLATE_FILE} --parameter-overrides SwaggerS3File=${BUCKET} --stack-name ${STACK_NAME} --capabilities CAPABILITY_IAM
 aws cloudformation deploy --template-file ${TEMPLATE_FILE} --parameter-overrides SwaggerS3File=${BUCKET} Name=${NAME} --stack-name ${STACK_NAME} --capabilities CAPABILITY_NAMED_IAM
+
+echo "Updating UserPoolClient with attributes not available with Cloudformation"
+USERPOOL_CLIENT_ID=$(aws cloudformation describe-stacks --stack-name ${STACK_NAME} --query 'Stacks[0].Outputs[?OutputKey==`UserPoolClientId`].OutputValue' --output text)
+USERPOOL_ID=$(aws cloudformation describe-stacks --stack-name ${STACK_NAME} --query 'Stacks[0].Outputs[?OutputKey==`UserPoolId`].OutputValue' --output text)
+echo "UserPoolId: ${USERPOOL_ID}, UserpoolClientId: ${USERPOOL_CLIENT_ID}"
+
+aws cognito-idp update-user-pool-client --user-pool-id ${USERPOOL_ID} --client-id ${USERPOOL_CLIENT_ID} \
+--supported-identity-providers 'COGNITO' \
+--callback-urls '["http://localhost:4200/cognito-callback"]' \
+--logout-urls '["http://localhost:4200"]' \
+--allowed-o-auth-flows 'implicit' \
+--allowed-o-auth-scopes 'aws.cognito.signin.user.admin' 'email' 'openid' 'phone'  'profile' \
+--allowed-o-auth-flows-user-pool-client
+
+aws cognito-idp delete-user-pool-domain --user-pool-id ${USERPOOL_ID} --domain "ocpapersubmission-${USERPOOL_CLIENT_ID}" >/dev/null 2>&1
+aws cognito-idp create-user-pool-domain --user-pool-id ${USERPOOL_ID} --domain "ocpapersubmission-${USERPOOL_CLIENT_ID}"
 

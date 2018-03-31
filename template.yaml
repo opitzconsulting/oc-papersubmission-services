@@ -85,6 +85,84 @@ Resources:
         - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
       Path: /
 
+  CognitoUserPool:
+    Type: "AWS::Cognito::UserPool"
+    Properties:
+      UserPoolName: !Join ['', [!Ref 'Name', 'OCPapersubmission', 'Pool']]
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: "OFF"
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: false
+      Schema:
+        - Name: name
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+        - Name: email
+          AttributeDataType: String
+          Mutable: false
+          Required: true
+        - Name: phone_number
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+      UserPoolTags:
+        'Name' : !Ref Name
+
+  CognitoUserPoolClient:
+    Type: "AWS::Cognito::UserPoolClient"
+    Properties:
+      ClientName: 'Papersubmission Client'
+      ExplicitAuthFlows:
+        - USER_PASSWORD_AUTH
+      GenerateSecret: true
+      ReadAttributes:
+        - "address"
+        - "birthdate"
+        - "email"
+        - "email_verified"
+        - "family_name"
+        - "gender"
+        - "given_name"
+        - "locale"
+        - "middle_name"
+        - "name"
+        - "nickname"
+        - "phone_number"
+        - "phone_number_verified"
+        - "picture"
+        - "preferred_username"
+        - "profile"
+        - "updated_at"
+        - "website"
+        - "zoneinfo"
+      RefreshTokenValidity: 30
+      UserPoolId: !Ref CognitoUserPool
+      WriteAttributes:
+        - "address"
+        - "birthdate"
+        - "email"
+        - "family_name"
+        - "gender"
+        - "given_name"
+        - "locale"
+        - "middle_name"
+        - "name"
+        - "nickname"
+        - "phone_number"
+        - "picture"
+        - "preferred_username"
+        - "profile"
+        - "updated_at"
+        - "website"
+        - "zoneinfo"
+
 Outputs:
   ApiUrl:
     Description: URL of your API endpoint
@@ -95,6 +173,11 @@ Outputs:
         - '.execute-api.'
         - !Ref 'AWS::Region'
         - '.amazonaws.com/Prod'
+  UserPoolId:
+    Value: !Ref CognitoUserPool
+  UserPoolClientId:
+    Value: !Ref CognitoUserPoolClient
+
 
 
 #  SlideRequest:
